@@ -132,7 +132,22 @@ class StaticGestureTest:
     
     def test_from_webcam(self):
         """Captura una imagen de la webcam y la analiza"""
-        cap = cv2.VideoCapture(0)
+        # Buscar cámara disponible
+        cap = None
+        for i in range(10):
+            test_cap = cv2.VideoCapture(i)
+            if test_cap.isOpened():
+                ret, _ = test_cap.read()
+                if ret:
+                    cap = test_cap
+                    print(f"✅ Cámara encontrada en índice {i}")
+                    break
+                test_cap.release()
+        
+        if cap is None:
+            print("\n❌ ERROR: No se pudo acceder a ninguna cámara")
+            print("\nEjecuta: python camera_detector.py para diagnosticar")
+            return
         
         print("\n" + "="*50)
         print("CAPTURA DE IMAGEN PARA PRUEBA")

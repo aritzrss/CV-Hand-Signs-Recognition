@@ -157,9 +157,31 @@ class RealTimeGestureRecognizer:
         
         return image
     
+    def find_camera(self):
+        """Encuentra una cámara disponible"""
+        for i in range(10):
+            cap = cv2.VideoCapture(i)
+            if cap.isOpened():
+                ret, _ = cap.read()
+                if ret:
+                    print(f"✅ Cámara encontrada en índice {i}")
+                    return cap, i
+                cap.release()
+        return None, -1
+    
     def run(self):
         """Ejecuta el reconocimiento en tiempo real"""
-        cap = cv2.VideoCapture(0)
+        cap, cam_index = self.find_camera()
+        
+        if cap is None:
+            print("\n❌ ERROR: No se pudo acceder a ninguna cámara")
+            print("\nPosibles soluciones:")
+            print("1. Verifica que tu cámara esté conectada")
+            print("2. Cierra otras aplicaciones que usen la cámara (Zoom, Skype, etc.)")
+            print("3. Ejecuta: python camera_detector.py")
+            print("4. En Linux, verifica permisos: sudo chmod 666 /dev/video*")
+            return
+        
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         
