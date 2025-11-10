@@ -24,7 +24,7 @@ class GestureModelTrainer:
             'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42),
             'SVM': SVC(kernel='rbf', C=1.0, gamma='scale', random_state=42),
             'KNN': KNeighborsClassifier(n_neighbors=5),
-            'Neural Network': MLPClassifier(hidden_layers=(128, 64, 32), 
+            'Neural Network': MLPClassifier(hidden_layer_sizes=(128, 64, 32), 
                                            max_iter=500, 
                                            random_state=42)
         }

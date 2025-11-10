@@ -67,14 +67,45 @@ class GestureCapture:
     
     def find_camera(self):
         """Encuentra una cámara disponible"""
+        print("\n🔍 Buscando cámaras disponibles...")
+        
         for i in range(10):
-            cap = cv2.VideoCapture(i)
-            if cap.isOpened():
-                ret, _ = cap.read()
-                if ret:
-                    print(f"✅ Cámara encontrada en índice {i}")
-                    return cap, i
-                cap.release()
+            try:
+                cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)  # Usar DirectShow en Windows
+                if cap.isOpened():
+                    # Intentar leer un frame de prueba
+                    ret, frame = cap.read()
+                    if ret and frame is not None and frame.size > 0:
+                        # Verificar que el frame tiene dimensiones válidas
+                        if frame.shape[0] > 0 and frame.shape[1] > 0:
+                            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                            print(f"✅ Cámara encontrada en índice {i}")
+                            print(f"   Resolución: {width}x{height}")
+                            return cap, i
+                    cap.release()
+            except Exception as e:
+                if cap:
+                    cap.release()
+                continue
+        
+        # Si DirectShow falla, intentar sin especificar backend
+        print("\n⚠️  DirectShow falló, intentando con backend automático...")
+        for i in range(10):
+            try:
+                cap = cv2.VideoCapture(i)
+                if cap.isOpened():
+                    ret, frame = cap.read()
+                    if ret and frame is not None and frame.size > 0:
+                        if frame.shape[0] > 0 and frame.shape[1] > 0:
+                            print(f"✅ Cámara encontrada en índice {i}")
+                            return cap, i
+                    cap.release()
+            except:
+                if cap:
+                    cap.release()
+                continue
+        
         return None, -1
     
     def run(self):
@@ -90,8 +121,23 @@ class GestureCapture:
             print("4. En Linux, verifica permisos: sudo chmod 666 /dev/video*")
             return
         
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        # Configurar resolución con manejo de errores
+        try:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        except:
+            pass  # Si falla, usar resolución por defecto
+        
+        # Verificar que la cámara puede leer frames
+        ret, test_frame = cap.read()
+        if not ret or test_frame is None:
+            print("\n❌ ERROR: No se puede leer de la cámara")
+            print("Posibles soluciones:")
+            print("1. Cierra otras aplicaciones que usen la cámara")
+            print("2. Verifica permisos de cámara en Windows")
+            print("3. Reinicia el ordenador")
+            cap.release()
+            return
         
         print("=" * 50)
         print("CAPTURA DE GESTOS LSE")
@@ -103,11 +149,20 @@ class GestureCapture:
         print("\n" + "=" * 50)
         
         capturing = False
+        frame_errors = 0
+        max_frame_errors = 10
         
         while cap.isOpened():
             success, image = cap.read()
-            if not success:
+            if not success or image is None:
+                frame_errors += 1
+                if frame_errors > max_frame_errors:
+                    print(f"\n❌ ERROR: Demasiados errores de lectura ({frame_errors})")
+                    print("La cámara se desconectó o dejó de responder")
+                    break
                 continue
+            
+            frame_errors = 0  # Resetear contador si la lectura fue exitosa
             
             image = cv2.flip(image, 1)
             landmarks_array, hand_landmarks = self.extract_landmarks(image)
@@ -198,12 +253,16 @@ class GestureCapture:
         np.save(f'data/gestures_data_{timestamp}.npy', np.array(self.data))
         np.save(f'data/gestures_labels_{timestamp}.npy', np.array(self.labels))
         
-        # Guardar metadata
+        # Contar muestras por gesto
+        unique_labels, counts = np.unique(self.labels, return_counts=True)
+        samples_per_gesture = {str(label): int(count) for label, count in zip(unique_labels, counts)}
+        
+        # Guardar metadata (convertir a tipos nativos de Python)
         metadata = {
             'timestamp': timestamp,
-            'num_samples': len(self.data),
+            'num_samples': int(len(self.data)),
             'gestures': self.gestures,
-            'samples_per_gesture': dict(zip(*np.unique(self.labels, return_counts=True)))
+            'samples_per_gesture': samples_per_gesture
         }
         
         with open(f'data/metadata_{timestamp}.json', 'w') as f:
@@ -211,7 +270,7 @@ class GestureCapture:
         
         print(f"\n✓ Datos guardados en data/gestures_data_{timestamp}.npy")
         print(f"✓ Total de muestras: {len(self.data)}")
-        print(f"✓ Distribución: {metadata['samples_per_gesture']}")
+        print(f"✓ Distribución: {samples_per_gesture}")
 
 if __name__ == "__main__":
     capturer = GestureCapture()
